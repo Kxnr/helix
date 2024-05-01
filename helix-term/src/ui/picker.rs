@@ -199,8 +199,12 @@ pub struct Picker<T: Item> {
     /// Caches paths to documents
     preview_cache: HashMap<PathBuf, CachedPreview>,
     read_buffer: Vec<u8>,
+
     /// Given an item in the picker, return the file path and line number to display.
     file_fn: Option<FileCallback<T>>,
+
+    to_item_fn: Option<ToItemCallback<T>>,
+    default_item: Option<T>
 }
 
 impl<T: Item + 'static> Picker<T> {
@@ -280,6 +284,8 @@ impl<T: Item + 'static> Picker<T> {
             preview_cache: HashMap::new(),
             read_buffer: Vec::with_capacity(1024),
             file_fn: None,
+            to_item_fn: None,
+            default_item: None
         }
     }
 
@@ -304,6 +310,14 @@ impl<T: Item + 'static> Picker<T> {
         // assumption: if we have a preview we are matching paths... If this is ever
         // not true this could be a separate builder function
         self.matcher.update_config(Config::DEFAULT.match_paths());
+        self
+    }
+
+    pub fn with_query_item(
+        mut self,
+        to_item_fn: impl Fn(String) -> Option<T> + 'static
+    ) -> Self {
+        self.to_item_fn = Some(Box::new(to_item_fn));
         self
     }
 
@@ -365,6 +379,7 @@ impl<T: Item + 'static> Picker<T> {
             .snapshot()
             .get_matched_item(self.cursor)
             .map(|item| item.data)
+            .or(self.default_item.as_ref())
     }
 
     pub fn toggle_preview(&mut self) {
@@ -383,6 +398,10 @@ impl<T: Item + 'static> Picker<T> {
                     pattern.starts_with(&self.previous_pattern),
                 );
                 self.previous_pattern = pattern.clone();
+
+                if let Some(to_item_fn) = &self.to_item_fn {
+                    self.default_item = to_item_fn(pattern.clone());
+                }
             }
         }
         EventResult::Consumed(None)
@@ -663,12 +682,27 @@ impl<T: Item + 'static> Picker<T> {
             row
         });
 
-        let table = Table::new(options)
-            .style(text_style)
-            .highlight_style(selected)
-            .highlight_symbol(" > ")
-            .column_spacing(1)
-            .widths(&self.widths);
+        let table: Table;
+
+        if let Some(item) = &self.default_item {
+            // TODO: add create label or similar to this item
+            let extended_options = options.chain(std::iter::once(item.format(&self.editor_data))).take(rows.try_into().unwrap_or(usize::MAX));
+
+            table = Table::new(extended_options)
+                .style(text_style)
+                .highlight_style(selected)
+                .highlight_symbol(" > ")
+                .column_spacing(1)
+                .widths(&self.widths);
+        } else {
+            table = Table::new(options)
+                .style(text_style)
+                .highlight_style(selected)
+                .highlight_symbol(" > ")
+                .column_spacing(1)
+                .widths(&self.widths);
+        }
+
 
         use tui::widgets::TableState;
 
@@ -867,10 +901,10 @@ impl<T: Item + 'static + Send + Sync> Component for Picker<T> {
         ctx.editor.reset_idle_timer();
 
         match key_event {
-            shift!(Tab) | key!(Up) | ctrl!('p') => {
+            shift!(Tab) | key!(Up) | ctrl!('p') | ctrl!('k') => {
                 self.move_by(1, Direction::Backward);
             }
-            key!(Tab) | key!(Down) | ctrl!('n') => {
+            key!(Tab) | key!(Down) | ctrl!('n') | ctrl!('j') => {
                 self.move_by(1, Direction::Forward);
             }
             key!(PageDown) | ctrl!('d') => {
@@ -948,6 +982,8 @@ impl<T: Item> Drop for Picker<T> {
 }
 
 type PickerCallback<T> = Box<dyn Fn(&mut Context, &T, Action)>;
+
+pub type ToItemCallback<T> = Box<dyn Fn(String) -> Option<T>>;
 
 /// Returns a new list of options to replace the contents of the picker
 /// when called with the current picker query,
