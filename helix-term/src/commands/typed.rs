@@ -1406,14 +1406,15 @@ fn lsp_workspace_command(
         };
         cx.jobs.callback(callback);
     } else {
-        let command = args.join(" ");
+        let command = args.first().expect("Args is not empty.").to_string();
+        let arguments: Result<Vec<_>, _> =  args[1..].iter().map(serde_json::to_value).collect();
         if options.commands.iter().any(|c| c == &command) {
             execute_lsp_command(
                 cx.editor,
                 language_server_id,
                 helix_lsp::lsp::Command {
                     title: command.clone(),
-                    arguments: None,
+                    arguments: arguments.ok(),
                     command,
                 },
             );
