@@ -326,7 +326,7 @@ impl MappableCommand {
         append_mode, "Append after selection",
         command_mode, "Enter command mode",
         file_picker, "Open file picker",
-        file_picker_in_current_buffer_directory, "Open file picker at current buffers's directory",
+        file_picker_in_current_buffer_directory, "Open file picker at current buffer's directory",
         file_picker_in_current_directory, "Open file picker at current working directory",
         code_action, "Perform code action",
         buffer_picker, "Open buffer picker",
@@ -1256,7 +1256,8 @@ fn goto_file_impl(cx: &mut Context, action: Action) {
         }
 
         if let Ok(url) = Url::parse(p) {
-            return open_url(cx, url, action);
+            open_url(cx, url, action);
+            continue;
         }
 
         let path = &rel_path.join(p);

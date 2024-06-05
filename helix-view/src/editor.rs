@@ -386,7 +386,7 @@ pub fn get_terminal_provider() -> Option<TerminalConfig> {
     })
 }
 
-#[cfg(not(any(windows, target_os = "wasm32")))]
+#[cfg(not(any(windows, target_arch = "wasm32")))]
 pub fn get_terminal_provider() -> Option<TerminalConfig> {
     use helix_stdx::env::{binary_exists, env_var_is_set};
 
@@ -1356,6 +1356,7 @@ impl Editor {
         let doc = doc_mut!(self, &doc_id);
         let diagnostics = Editor::doc_diagnostics(&self.language_servers, &self.diagnostics, doc);
         doc.replace_diagnostics(diagnostics, &[], None);
+        doc.reset_all_inlay_hints();
     }
 
     /// Launch a language server for a given document
