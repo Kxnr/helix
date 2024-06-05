@@ -53,8 +53,9 @@ ltex-ls = { command = "ltex-ls" }
 markdoc-ls = { command = "markdoc-ls", args = ["--stdio"] }
 markdown-oxide = { command = "markdown-oxide" }
 marksman = { command = "marksman", args = ["server"] }
-metals = { command = "metals", config = { "isHttpEnabled" = true } }
+metals = { command = "metals", config = { "isHttpEnabled" = true, metals = { inlayHints = { typeParameters = {enable = true} , hintsInPatternMatch = {enable = true} }  } } }
 mint = { command = "mint", args = ["ls"] }
+mojo-lsp = { command = "mojo-lsp-server" }
 nil = { command = "nil" }
 nimlangserver = { command = "nimlangserver" }
 nimlsp = { command = "nimlsp" }
@@ -67,6 +68,7 @@ openscad-lsp = { command = "openscad-lsp", args = ["--stdio"] }
 pasls = { command = "pasls", args = [] }
 pbkit = { command = "pb", args = [ "lsp" ] }
 perlnavigator = { command = "perlnavigator", args= ["--stdio"] }
+pest-language-server = { command = "pest-language-server" }
 prisma-language-server = { command = "prisma-language-server", args = ["--stdio"] }
 purescript-language-server = { command = "purescript-language-server", args = ["--stdio"] }
 pylsp = { command = "pylsp" }
@@ -195,6 +197,28 @@ inlayHints.propertyDeclarationTypes.enabled = true
 inlayHints.functionLikeReturnTypes.enabled = true
 inlayHints.enumMemberValues.enabled = true
 inlayHints.parameterNames.enabled = "all"
+
+[language-server.vscode-eslint-language-server]
+command = "vscode-eslint-language-server"
+args = ["--stdio"]
+
+[language-server.vscode-eslint-language-server.config]
+validate = "on"
+experimental = { useFlatConfig = false }
+rulesCustomizations = []
+run = "onType"
+problems = { shortenToSingleLine = false }
+nodePath = ""
+
+[language-server.vscode-eslint-language-server.config.codeAction.disableRuleComment]
+enable = true
+location = "separateLine"
+
+[language-server.vscode-eslint-language-server.config.codeAction.showDocumentation]
+enable = true
+
+[language-server.vscode-eslint-language-server.config.workingDirectory]
+mode = "location"
 
 [[language]]
 name = "rust"
@@ -348,6 +372,22 @@ comment-token = "//"
 block-comment-tokens = { start = "/*", end = "*/" }
 language-servers = [ "mint" ]
 indent = { tab-width = 2, unit = "  " }
+
+[[language]]
+name = "mojo"
+scope = "source.mojo"
+roots = ["__init__.mojo"]
+injection-regex = "mojo"
+file-types = ["mojo", "🔥"]
+language-servers = [ "mojo-lsp" ]
+comment-token = "#"
+indent = { tab-width = 4, unit = "    " }
+auto-format = true
+formatter = { command = "mojo", args = ["format", "-q", "-"]}
+
+[[grammar]]
+name = "mojo"
+source = { git = "https://github.com/lsh/tree-sitter-mojo", rev = "3d7c53b8038f9ebbb57cd2e61296180aa5c1cf64" }
 
 [[language]]
 name = "janet"
@@ -1038,6 +1078,13 @@ comment-token = "--"
 block-comment-tokens = { start = "/-", end = "-/" }
 language-servers = [ "lean" ]
 indent = { tab-width = 2, unit = "  " }
+
+[language.auto-pairs]
+'(' = ')'
+'{' = '}'
+'[' = ']'
+'"' = '"'
+'⟨' = '⟩'
 
 [[grammar]]
 name = "lean"
@@ -2079,7 +2126,7 @@ args = { console = "internalConsole", attachCommands = [ "platform select remote
 
 [[grammar]]
 name = "odin"
-source = { git = "https://github.com/ap29600/tree-sitter-odin", rev = "b219207e49ffca2952529d33e94ed63b1b75c4f1" }
+source = { git = "https://github.com/tree-sitter-grammars/tree-sitter-odin", rev = "b5f668ef8918aab13812ce73acd89fe191fb8c5e" }
 
 [[language]]
 name = "meson"
@@ -2220,7 +2267,7 @@ source = { git = "https://github.com/sogaiu/tree-sitter-clojure", rev = "e57c569
 name = "starlark"
 scope = "source.starlark"
 injection-regex = "(starlark|bzl|bazel)"
-file-types = ["bzl", "bazel", "star", { glob = "BUILD" }, { glob = "BUILD.*" }, { glob = "Tiltfile" }]
+file-types = ["bzl", "bazel", "star", { glob = "BUILD" }, { glob = "BUILD.*" }, { glob = "Tiltfile" }, { glob = "WORKSPACE" }]
 comment-token = "#"
 indent = { tab-width = 4, unit = "    " }
 grammar = "python"
@@ -2318,7 +2365,7 @@ language-servers = [ "slint-lsp" ]
 
 [[grammar]]
 name = "slint"
-source = { git = "https://github.com/slint-ui/tree-sitter-slint", rev = "3c82235f41b63f35a01ae3888206e93585cbb84a" }
+source = { git = "https://github.com/slint-ui/tree-sitter-slint", rev = "0701312b74b87fe20e61aa662ba41c5815b5d428" }
 
 [[language]]
 name = "task"
@@ -2660,6 +2707,21 @@ indent = { tab-width = 4, unit = "\t" }
 [[grammar]]
 name = "ini"
 source = { git = "https://github.com/justinmk/tree-sitter-ini", rev = "4d247fb876b4ae6b347687de4a179511bf67fcbc" }
+
+[[language]]
+name = "inko"
+auto-format = true
+scope = "source.inko"
+injection-regex = "inko"
+file-types = ["inko"]
+roots = ["inko.pkg"]
+comment-token = "#"
+indent = { tab-width = 2, unit = "  " }
+formatter = { command = "inko", args = ["fmt", "-"] }
+
+[[grammar]]
+name = "inko"
+source = { git = "https://github.com/inko-lang/tree-sitter-inko", rev = "7860637ce1b43f5f79cfb7cc3311bf3234e9479f" }
 
 [[language]]
 name = "bicep"
@@ -3503,7 +3565,7 @@ language-servers = ["earthlyls"]
 
 [[grammar]]
 name = "earthfile"
-source = { git = "https://github.com/glehmann/tree-sitter-earthfile", rev = "a079e6c472eeedd6b9a1e03ca0b6c82cd6a112a4" }
+source = { git = "https://github.com/glehmann/tree-sitter-earthfile", rev = "dbfb970a59cd87b628d087eb8e3fbe19c8e20601" }
 
 [[language]]
 name = "adl"
@@ -3558,3 +3620,71 @@ language-servers = []
 [[grammar]]
 name = "move"
 source = { git = "https://github.com/tzakian/tree-sitter-move", rev = "8bc0d1692caa8763fef54d48068238d9bf3c0264" }
+
+[[language]]
+name = "pest"
+scope = "source.pest"
+injection-regex = "pest"
+file-types = ["pest"]
+comment-tokens = ["//", "///", "//!"]
+block-comment-tokens = { start = "/*", end = "*/" }
+indent = { tab-width = 4, unit = "    " }
+language-servers = ["pest-language-server"]
+
+[language.auto-pairs]
+'(' = ')'
+'{' = '}'
+'[' = ']'
+'"' = '"'
+
+[[grammar]]
+name = "pest"
+source = { git = "https://github.com/pest-parser/tree-sitter-pest", rev = "a8a98a824452b1ec4da7f508386a187a2f234b85" }
+
+[[language]]
+name = "gjs"
+scope = "source.gjs"
+file-types = ["gjs"]
+roots = ["package.json", "ember-cli-build.js"]
+comment-token = "//"
+block-comment-tokens = { start = "/*", end = "*/" }
+language-servers = [
+    { except-features = [
+        "format", "diagnostics",
+    ], name = "typescript-language-server" },
+    "vscode-eslint-language-server",
+    "ember-language-server",
+]
+indent = { tab-width = 2, unit = "  " }
+grammar = "javascript"
+
+[language.auto-pairs]
+'<' = '>'
+"'" = "'"
+"{" = "}"
+"(" = ")"
+'"' = '"'
+
+[[language]]
+name = "gts"
+scope = "source.gts"
+file-types = ["gts"]
+roots = ["package.json", "ember-cli-build.js"]
+comment-token = "//"
+block-comment-tokens = { start = "/*", end = "*/" }
+language-servers = [
+    { except-features = [
+        "format", "diagnostics",
+    ], name = "typescript-language-server" },
+    "vscode-eslint-language-server",
+    "ember-language-server",
+]
+indent = { tab-width = 2, unit = "  " }
+grammar = "typescript"
+
+[language.auto-pairs]
+'<' = '>'
+"'" = "'"
+"{" = "}"
+"(" = ")"
+'"' = '"'
