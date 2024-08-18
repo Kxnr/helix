@@ -263,6 +263,7 @@ pub struct Picker<T: 'static + Send + Sync, D: 'static> {
     widths: Vec<Constraint>,
 
     callback_fn: PickerCallback<T>,
+    default_fn: Option<DefaultCallback>,
 
     pub truncate_start: bool,
     /// Caches paths to documents
@@ -387,6 +388,7 @@ impl<T: 'static + Send + Sync, D: 'static + Send + Sync> Picker<T, D> {
             truncate_start: true,
             show_preview: true,
             callback_fn: Box::new(callback_fn),
+            default_fn: None,
             completion_height: 0,
             widths,
             preview_cache: HashMap::new(),
@@ -410,6 +412,11 @@ impl<T: 'static + Send + Sync, D: 'static + Send + Sync> Picker<T, D> {
 
     pub fn truncate_start(mut self, truncate_start: bool) -> Self {
         self.truncate_start = truncate_start;
+        self
+    }
+
+    pub fn with_default_action(mut self, default_action: DefaultCallback) -> Self {
+        self.default_fn = Some(default_action);
         self
     }
 
@@ -1065,6 +1072,11 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                 }
                 return close_fn(self);
             }
+            ctrl!('o') => {
+                if let Some(default_action) = self.default_fn {
+                    default_action(ctx, &self.primary_query(), Action::Load);
+                }
+            }
             ctrl!('v') => {
                 if let Some(option) = self.selection() {
                     (self.callback_fn)(ctx, option, Action::VerticalSplit);
@@ -1110,3 +1122,4 @@ impl<T: 'static + Send + Sync, D> Drop for Picker<T, D> {
 }
 
 type PickerCallback<T> = Box<dyn Fn(&mut Context, &T, Action)>;
+type DefaultCallback = Box<dyn Fn(&mut Context, &str, Action)>;
