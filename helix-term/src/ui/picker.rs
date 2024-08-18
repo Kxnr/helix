@@ -1073,8 +1073,9 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                 return close_fn(self);
             }
             ctrl!('o') => {
-                if let Some(default_action) = self.default_fn {
+                if let Some(default_action) = self.default_fn.as_ref() {
                     default_action(ctx, &self.primary_query(), Action::Load);
+                    return close_fn(self);
                 }
             }
             ctrl!('v') => {

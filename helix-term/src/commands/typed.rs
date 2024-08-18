@@ -1439,7 +1439,7 @@ fn lsp_workspace_command(
                     *ls_id,
                     helix_lsp::lsp::Command {
                         title: command.clone(),
-                        arguments,
+                        arguments: arguments.ok(),
                         command,
                     },
                 );
