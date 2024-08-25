@@ -3,7 +3,7 @@ use crate::{
     compositor::{Component, Context, Event, EventResult},
     events::{OnModeSwitch, PostCommand},
     key,
-    keymap::{KeymapResult, Keymaps},
+    keymap::{KeyTrie, KeymapResult, Keymaps},
     ui::{
         document::{render_document, LinePos, TextRenderer},
         statusline,
@@ -895,6 +895,14 @@ impl EditorView {
                 }
             }
 
+            if let Some(trie) = self.keymaps.map().get(&current_mode) {
+                match trie {
+                    KeyTrie::Node(node) => {
+                        cxt.editor.autoinfo = Some(node.infobox());
+                    }
+                    _ => {}
+                }
+            }
             last_mode = current_mode;
         };
 
