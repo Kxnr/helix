@@ -10,7 +10,7 @@ use crate::{
     register::Registers,
     theme::{self, Theme},
     tree::{self, Tree},
-    Document, DocumentId, View, ViewId,
+    Dictionary, Document, DocumentId, View, ViewId,
 };
 use dap::StackFrame;
 use helix_vcs::DiffProviderRegistry;
@@ -1081,6 +1081,9 @@ pub struct Editor {
 
     pub mouse_down_range: Option<Range>,
     pub cursor_cache: CursorCache,
+
+    /// HACK:
+    pub dictionary: Dictionary,
 }
 
 pub type Motion = Box<dyn Fn(&mut Editor)>;
@@ -1160,6 +1163,16 @@ impl Editor {
         // HAXX: offset the render area height by 1 to account for prompt/commandline
         area.height -= 1;
 
+        // HACK:
+        let aff =
+            std::fs::read_to_string(helix_loader::runtime_file("dictionaries/en_US/en_US.aff"))
+                .unwrap();
+        let dic =
+            std::fs::read_to_string(helix_loader::runtime_file("dictionaries/en_US/en_US.dic"))
+                .unwrap();
+        let mut dictionary = Dictionary::new(&aff, &dic).unwrap();
+        dictionary.add("khepri").unwrap();
+
         Self {
             mode: Mode::Normal,
             tree: Tree::new(area),
@@ -1198,6 +1211,7 @@ impl Editor {
             handlers,
             mouse_down_range: None,
             cursor_cache: CursorCache::default(),
+            dictionary,
         }
     }
 
