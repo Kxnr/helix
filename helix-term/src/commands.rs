@@ -4361,6 +4361,8 @@ fn paste_impl(
         transaction = transaction.with_selection(Selection::new(ranges, selection.primary_index()));
     }
 
+    // TODO: don't change editor state if pasting into command
+
     doc.apply(&transaction, view.id);
     doc.append_changes_to_history(view);
 }
