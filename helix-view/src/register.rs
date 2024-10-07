@@ -45,6 +45,17 @@ impl Registers {
     pub fn read<'a>(&'a self, name: char, editor: &'a Editor) -> Option<RegisterValues<'a>> {
         match name {
             '_' => Some(RegisterValues::new(iter::empty())),
+            '=' => {
+                let (view, doc) = current_ref!(editor);
+                let selections = doc.selection(view.id).line_ranges(doc.text().slice(..));
+                Some(RegisterValues::new(
+                    selections
+                        .map(|(start, end)| Cow::from(format!("{}, {}", start, end)))
+                        // need to collect to make an exact size iterator
+                        .collect::<Vec<_>>()
+                        .into_iter(),
+                ))
+            }
             '#' => {
                 let (view, doc) = current_ref!(editor);
                 let selections = doc.selection(view.id).len();
