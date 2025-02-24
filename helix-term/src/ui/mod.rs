@@ -253,7 +253,19 @@ pub fn file_picker(root: PathBuf, config: &helix_view::editor::Config) -> FilePi
             cx.editor.set_error(err);
         }
     })
-    .with_preview(|_editor, path| Some((path.as_path().into(), None)));
+    .with_preview(|_editor, path| Some((path.as_path().into(), None)))
+    .with_default_action(Box::new(|cx, path, action| {
+        let path = PathBuf::from(path);
+        if let Err(e) = cx.editor.open(&path, action) {
+            let err = if let Some(err) = e.source() {
+                format!("{}", err)
+            } else {
+                format!("unable to open \"{}\"", path.display())
+            };
+            cx.editor.set_error(err);
+        }
+    }));
+
     let injector = picker.injector();
     let timeout = std::time::Instant::now() + std::time::Duration::from_millis(30);
 

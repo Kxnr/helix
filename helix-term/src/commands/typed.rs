@@ -1481,7 +1481,8 @@ fn lsp_workspace_command(
         };
         cx.jobs.callback(callback);
     } else {
-        let command = args.join(" ");
+        let command = args.first().expect("Args is not empty.").to_string();
+        let arguments: Result<Vec<_>, _> = args[1..].iter().map(serde_json::to_value).collect();
         let matches: Vec<_> = ls_id_commands
             .filter(|(_ls_id, c)| *c == &command)
             .collect();
@@ -1493,7 +1494,7 @@ fn lsp_workspace_command(
                     *ls_id,
                     helix_lsp::lsp::Command {
                         title: command.clone(),
-                        arguments: None,
+                        arguments: arguments.ok(),
                         command,
                     },
                 );
