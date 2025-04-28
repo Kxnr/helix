@@ -42,11 +42,7 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
         text,
         selection,
         |cursor| {
-            while !cursor.goto_next_sibling() {
-                if !cursor.goto_parent() {
-                    break;
-                }
-            }
+            cursor.goto_next_sibling();
         },
         Some(Direction::Forward),
     )
@@ -95,11 +91,7 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
         text,
         selection,
         |cursor| {
-            while !cursor.goto_previous_sibling() {
-                if !cursor.goto_parent() {
-                    break;
-                }
-            }
+            cursor.goto_previous_sibling();
         },
         Some(Direction::Backward),
     )
@@ -126,9 +118,12 @@ where
         motion(cursor);
 
         let node = cursor.node();
-        let from = text.byte_to_char(node.start_byte() as usize);
-        let to = text.byte_to_char(node.end_byte() as usize);
+        let new_from = text.byte_to_char(node.start_byte() as usize);
+        let new_to = text.byte_to_char(node.end_byte() as usize);
 
-        Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()))
+        // TODO: take min of from and max of to if in extend mode
+        // Range::new(min(from, new_from), max(to, new_to))
+        //     .with_direction(direction.unwrap_or_else(|| range.direction()))
+        Range::new(new_from, new_to).with_direction(direction.unwrap_or_else(|| range.direction()))
     })
 }
