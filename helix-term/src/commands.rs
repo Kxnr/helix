@@ -1765,6 +1765,7 @@ pub fn scroll(cx: &mut Context, offset: usize, direction: Direction, sync_cursor
     let cursor = range.cursor(text);
     let height = view.inner_height();
 
+    // TODO: allow cursor off screen if sync_cursor is false
     let scrolloff = config.scrolloff.min(height.saturating_sub(1) / 2);
     let offset = match direction {
         Forward => offset as isize,
