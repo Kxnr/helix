@@ -97,6 +97,61 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
     )
 }
 
+pub fn extend_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+    extend_node_impl(
+        syntax,
+        text,
+        selection,
+        |cursor| {
+            cursor.goto_next_sibling();
+        },
+        Direction::Forward,
+    )
+}
+
+pub fn extend_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+    extend_node_impl(
+        syntax,
+        text,
+        selection,
+        |cursor| {
+            cursor.goto_previous_sibling();
+        },
+        Direction::Backward,
+    )
+}
+
+fn extend_node_impl<F>(
+    syntax: &Syntax,
+    text: RopeSlice,
+    selection: Selection,
+    motion: F,
+    direction: Direction,
+) -> Selection
+where
+    F: Fn(&mut TreeCursor),
+{
+    let cursor = &mut syntax.walk();
+
+    selection.transform(|range| {
+        let from = text.char_to_byte(range.from()) as u32;
+        let to = text.char_to_byte(range.to()) as u32;
+
+        cursor.reset_to_byte_range(from, to);
+        motion(cursor);
+
+        let node = cursor.node();
+        let new_from = text.byte_to_char(node.start_byte() as usize);
+        let new_to = text.byte_to_char(node.end_byte() as usize);
+
+        // Anchor stays fixed; head moves to the boundary of the target sibling.
+        match direction {
+            Direction::Forward => Range::new(range.anchor, new_to),
+            Direction::Backward => Range::new(range.anchor, new_from),
+        }
+    })
+}
+
 fn select_node_impl<F>(
     syntax: &Syntax,
     text: RopeSlice,
@@ -121,9 +176,6 @@ where
         let new_from = text.byte_to_char(node.start_byte() as usize);
         let new_to = text.byte_to_char(node.end_byte() as usize);
 
-        // TODO: take min of from and max of to if in extend mode
-        // Range::new(min(from, new_from), max(to, new_to))
-        //     .with_direction(direction.unwrap_or_else(|| range.direction()))
         Range::new(new_from, new_to).with_direction(direction.unwrap_or_else(|| range.direction()))
     })
 }

@@ -529,6 +529,8 @@ impl MappableCommand {
         shrink_selection, "Shrink selection to previously expanded syntax node",
         select_next_sibling, "Select next sibling in the syntax tree",
         select_prev_sibling, "Select previous sibling the in syntax tree",
+        extend_next_sibling, "Extend selection to next sibling in the syntax tree",
+        extend_prev_sibling, "Extend selection to previous sibling in the syntax tree",
         select_all_siblings, "Select all siblings of the current node",
         select_all_children, "Select all children of the current node",
         jump_forward, "Jump forward on jumplist",
@@ -5730,6 +5732,14 @@ fn select_next_sibling(cx: &mut Context) {
 
 fn select_prev_sibling(cx: &mut Context) {
     select_sibling_impl(cx, object::select_prev_sibling)
+}
+
+fn extend_next_sibling(cx: &mut Context) {
+    select_sibling_impl(cx, object::extend_next_sibling)
+}
+
+fn extend_prev_sibling(cx: &mut Context) {
+    select_sibling_impl(cx, object::extend_prev_sibling)
 }
 
 fn move_node_bound_impl(cx: &mut Context, dir: Direction, movement: Movement) {
