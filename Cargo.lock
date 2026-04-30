@@ -1645,6 +1645,7 @@ dependencies = [
  "serde",
  "serde_json",
  "slotmap",
+ "spellbook",
  "tempfile",
  "termina",
  "thiserror",
@@ -2750,6 +2751,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b421f7b6aa4a5de8f685aaf398dfaa828346ee639d2b1c1061ab43d40baa6223"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "spellbook"
+version = "0.3.5"
+source = "git+https://github.com/helix-editor/spellbook.git#c946f1a950d6f3cee67ad88201ab840be3e4e57d"
+dependencies = [
+ "foldhash 0.1.5",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]

@@ -22,6 +22,7 @@ use helix_core::{
     unicode::width::UnicodeWidthStr,
     visual_offset_from_block, Change, Position, Range, Selection, Transaction,
 };
+use helix_stdx::rope::RopeSliceExt;
 use helix_view::{
     annotations::diagnostics::DiagnosticFilter,
     document::{Mode, SCRATCH_BUFFER_NAME},
@@ -29,7 +30,7 @@ use helix_view::{
     graphics::{Color, CursorKind, Modifier, Rect, Style},
     input::{KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     keyboard::{KeyCode, KeyModifiers},
-    Document, Editor, Theme, View,
+    Dictionary, Document, Editor, Theme, View,
 };
 use std::{mem::take, num::NonZeroUsize, ops, path::PathBuf, rc::Rc};
 
@@ -141,6 +142,12 @@ impl EditorView {
 
         if let Some(overlay) = Self::doc_document_link_highlights(doc, theme) {
             overlays.push(overlay);
+        }
+
+        if let Some(dict) = &editor.dictionary {
+            if let Some(overlay) = Self::doc_spell_highlights(dict, doc, view, theme) {
+                overlays.push(overlay);
+            }
         }
 
         Self::doc_diagnostics_highlights_into(doc, theme, &mut overlays);
@@ -512,6 +519,45 @@ impl EditorView {
                     existing_range.end = existing_range.end.max(link.end);
                 }
                 _ => ranges.push(link.start..link.end),
+            }
+        }
+
+        if ranges.is_empty() {
+            return None;
+        }
+
+        Some(OverlayHighlights::Homogeneous { highlight, ranges })
+    }
+
+    /// Highlight misspelled words using the editor's dictionary.
+    ///
+    /// This is a **very** naive implementation: it runs on every render and
+    /// uses a simple regex to tokenize words. It exists as a prototype to
+    /// explore spellbook integration; a real implementation would run
+    /// incrementally in the background and surface results as diagnostics.
+    pub fn doc_spell_highlights(
+        dict: &Dictionary,
+        doc: &Document,
+        view: &View,
+        theme: &Theme,
+    ) -> Option<OverlayHighlights> {
+        use helix_stdx::rope::Regex;
+        use once_cell::sync::Lazy;
+        static WORDS: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r#"[0-9A-Z]*(['-]?[a-z]+)*"#).unwrap());
+
+        let highlight = theme.find_highlight_exact("diagnostic.error")?;
+
+        let text = doc.text().slice(..);
+        let start = text.line_to_char(text.char_to_line(doc.view_offset(view.id).anchor));
+        let end = text.line_to_char(view.estimate_last_doc_line(doc) + 1);
+
+        let mut ranges = Vec::new();
+        for match_ in WORDS.find_iter(text.regex_input_at(start..end)) {
+            let range = text.byte_to_char(match_.start())..text.byte_to_char(match_.end());
+            let word = std::borrow::Cow::from(text.slice(range.clone()));
+            if !dict.check(&word) {
+                ranges.push(range);
             }
         }
 

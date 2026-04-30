@@ -1259,6 +1259,9 @@ pub struct Editor {
 
     pub mouse_down_range: Option<Range>,
     pub cursor_cache: CursorCache,
+
+    /// HACK: naive spell-checking dictionary
+    pub dictionary: Option<spellbook::Dictionary>,
 }
 
 pub type Motion = Box<dyn Fn(&mut Editor)>;
@@ -1382,6 +1385,19 @@ impl Editor {
             mouse_down_range: None,
             cursor_cache: CursorCache::default(),
             dir_stack: VecDeque::with_capacity(DIR_STACK_CAP),
+            // HACK: load a static English dictionary for spell-checking
+            dictionary: {
+                let aff = std::fs::read_to_string(
+                    helix_loader::runtime_file("dictionaries/en_US/en_US.aff"),
+                );
+                let dic = std::fs::read_to_string(
+                    helix_loader::runtime_file("dictionaries/en_US/en_US.dic"),
+                );
+                match (aff, dic) {
+                    (Ok(aff), Ok(dic)) => spellbook::Dictionary::new(&aff, &dic).ok(),
+                    _ => None,
+                }
+            },
         }
     }
 
