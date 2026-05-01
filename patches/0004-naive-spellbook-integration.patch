@@ -1,0 +1,198 @@
+From 24a40c9abbc4f405850ba6699f35465ed290d593 Mon Sep 17 00:00:00 2001
+From: Connor Keane <connor.keane@kxnr.me>
+Date: Wed, 29 Apr 2026 17:37:23 -0700
+Subject: [PATCH 4/5] naive spellbook integration
+
+Adds inline spell-checking via the helix-editor/spellbook library.
+Misspelled words are highlighted with diagnostic.error on every render.
+This is a prototype: a real implementation would run incrementally in
+the background and surface results as proper diagnostics.
+---
+ Cargo.lock                  | 10 ++++++++
+ Cargo.toml                  |  1 +
+ helix-term/src/ui/editor.rs | 48 ++++++++++++++++++++++++++++++++++++-
+ helix-view/Cargo.toml       |  1 +
+ helix-view/src/editor.rs    | 16 +++++++++++++
+ helix-view/src/lib.rs       |  1 +
+ 6 files changed, 76 insertions(+), 1 deletion(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 68d4f1b5..3ff60102 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1645,6 +1645,7 @@ dependencies = [
+  "serde",
+  "serde_json",
+  "slotmap",
++ "spellbook",
+  "tempfile",
+  "termina",
+  "thiserror",
+@@ -2752,6 +2753,15 @@ dependencies = [
+  "cfg-if",
+ ]
+ 
++[[package]]
++name = "spellbook"
++version = "0.3.5"
++source = "git+https://github.com/helix-editor/spellbook.git#c946f1a950d6f3cee67ad88201ab840be3e4e57d"
++dependencies = [
++ "foldhash 0.1.5",
++ "hashbrown 0.15.5",
++]
++
+ [[package]]
+ name = "stable_deref_trait"
+ version = "1.2.0"
+diff --git a/Cargo.toml b/Cargo.toml
+index 1ee15982..3344f11b 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -57,6 +57,7 @@ sonic-rs = "0.5"
+ globset = "0.4"
+ etcetera = "0.11"
+ arc-swap = "1.9"
++spellbook = { git = "https://github.com/helix-editor/spellbook.git" }
+ 
+ [workspace.package]
+ version = "25.7.1"
+diff --git a/helix-term/src/ui/editor.rs b/helix-term/src/ui/editor.rs
+index 7043efd2..81315448 100644
+--- a/helix-term/src/ui/editor.rs
++++ b/helix-term/src/ui/editor.rs
+@@ -22,6 +22,7 @@
+     unicode::width::UnicodeWidthStr,
+     visual_offset_from_block, Change, Position, Range, Selection, Transaction,
+ };
++use helix_stdx::rope::RopeSliceExt;
+ use helix_view::{
+     annotations::diagnostics::DiagnosticFilter,
+     document::{Mode, SCRATCH_BUFFER_NAME},
+@@ -29,7 +30,7 @@
+     graphics::{Color, CursorKind, Modifier, Rect, Style},
+     input::{KeyEvent, MouseButton, MouseEvent, MouseEventKind},
+     keyboard::{KeyCode, KeyModifiers},
+-    Document, Editor, Theme, View,
++    Dictionary, Document, Editor, Theme, View,
+ };
+ use std::{mem::take, num::NonZeroUsize, ops, path::PathBuf, rc::Rc};
+ 
+@@ -143,6 +144,12 @@ pub fn render_view(
+             overlays.push(overlay);
+         }
+ 
++        if let Some(dict) = &editor.dictionary {
++            if let Some(overlay) = Self::doc_spell_highlights(dict, doc, view, theme) {
++                overlays.push(overlay);
++            }
++        }
++
+         Self::doc_diagnostics_highlights_into(doc, theme, &mut overlays);
+ 
+         if is_focused {
+@@ -522,6 +529,45 @@ pub fn doc_document_link_highlights(
+         Some(OverlayHighlights::Homogeneous { highlight, ranges })
+     }
+ 
++    /// Highlight misspelled words using the editor's dictionary.
++    ///
++    /// This is a **very** naive implementation: it runs on every render and
++    /// uses a simple regex to tokenize words. It exists as a prototype to
++    /// explore spellbook integration; a real implementation would run
++    /// incrementally in the background and surface results as diagnostics.
++    pub fn doc_spell_highlights(
++        dict: &Dictionary,
++        doc: &Document,
++        view: &View,
++        theme: &Theme,
++    ) -> Option<OverlayHighlights> {
++        use helix_stdx::rope::Regex;
++        use once_cell::sync::Lazy;
++        static WORDS: Lazy<Regex> =
++            Lazy::new(|| Regex::new(r#"[0-9A-Z]*(['-]?[a-z]+)*"#).unwrap());
++
++        let highlight = theme.find_highlight_exact("diagnostic.error")?;
++
++        let text = doc.text().slice(..);
++        let start = text.line_to_char(text.char_to_line(doc.view_offset(view.id).anchor));
++        let end = text.line_to_char(view.estimate_last_doc_line(doc) + 1);
++
++        let mut ranges = Vec::new();
++        for match_ in WORDS.find_iter(text.regex_input_at(start..end)) {
++            let range = text.byte_to_char(match_.start())..text.byte_to_char(match_.end());
++            let word = std::borrow::Cow::from(text.slice(range.clone()));
++            if !dict.check(&word) {
++                ranges.push(range);
++            }
++        }
++
++        if ranges.is_empty() {
++            return None;
++        }
++
++        Some(OverlayHighlights::Homogeneous { highlight, ranges })
++    }
++
+     /// Get highlight spans for selections in a document view.
+     pub fn doc_selection_highlights(
+         mode: Mode,
+diff --git a/helix-view/Cargo.toml b/helix-view/Cargo.toml
+index eb958747..33005cb2 100644
+--- a/helix-view/Cargo.toml
++++ b/helix-view/Cargo.toml
+@@ -51,6 +51,7 @@ log = "~0.4"
+ 
+ parking_lot.workspace = true
+ thiserror.workspace = true
++spellbook.workspace = true
+ 
+ kstring = "2.0"
+ 
+diff --git a/helix-view/src/editor.rs b/helix-view/src/editor.rs
+index 2146bc87..ce9279cf 100644
+--- a/helix-view/src/editor.rs
++++ b/helix-view/src/editor.rs
+@@ -1259,6 +1259,9 @@ pub struct Editor {
+ 
+     pub mouse_down_range: Option<Range>,
+     pub cursor_cache: CursorCache,
++
++    /// HACK: naive spell-checking dictionary
++    pub dictionary: Option<spellbook::Dictionary>,
+ }
+ 
+ pub type Motion = Box<dyn Fn(&mut Editor)>;
+@@ -1382,6 +1385,19 @@ pub fn new(
+             mouse_down_range: None,
+             cursor_cache: CursorCache::default(),
+             dir_stack: VecDeque::with_capacity(DIR_STACK_CAP),
++            // HACK: load a static English dictionary for spell-checking
++            dictionary: {
++                let aff = std::fs::read_to_string(
++                    helix_loader::runtime_file("dictionaries/en_US/en_US.aff"),
++                );
++                let dic = std::fs::read_to_string(
++                    helix_loader::runtime_file("dictionaries/en_US/en_US.dic"),
++                );
++                match (aff, dic) {
++                    (Ok(aff), Ok(dic)) => spellbook::Dictionary::new(&aff, &dic).ok(),
++                    _ => None,
++                }
++            },
+         }
+     }
+ 
+diff --git a/helix-view/src/lib.rs b/helix-view/src/lib.rs
+index 701c6ab1..2a3622a8 100644
+--- a/helix-view/src/lib.rs
++++ b/helix-view/src/lib.rs
+@@ -74,5 +74,6 @@ pub fn align_view(doc: &mut Document, view: &View, align: Align) {
+ pub use document::Document;
+ pub use editor::Editor;
+ use helix_core::char_idx_at_visual_offset;
++pub use spellbook::Dictionary;
+ pub use theme::Theme;
+ pub use view::View;
+-- 
+2.43.0
+

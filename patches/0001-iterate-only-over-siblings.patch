@@ -1,0 +1,71 @@
+From bc5b10511ca8ac8b53c667205684ac11b8fe125f Mon Sep 17 00:00:00 2001
+From: Connor Keane <ckeane@ascendanalytics.com>
+Date: Sun, 27 Apr 2025 23:46:04 -0600
+Subject: [PATCH 1/5] iterate only over siblings
+
+---
+ helix-core/src/object.rs   | 21 ++++++++-------------
+ helix-term/src/commands.rs |  1 +
+ 2 files changed, 9 insertions(+), 13 deletions(-)
+
+diff --git a/helix-core/src/object.rs b/helix-core/src/object.rs
+index e0c02d0a..02362803 100644
+--- a/helix-core/src/object.rs
++++ b/helix-core/src/object.rs
+@@ -42,11 +42,7 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
+         text,
+         selection,
+         |cursor| {
+-            while !cursor.goto_next_sibling() {
+-                if !cursor.goto_parent() {
+-                    break;
+-                }
+-            }
++            cursor.goto_next_sibling();
+         },
+         Some(Direction::Forward),
+     )
+@@ -95,11 +91,7 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
+         text,
+         selection,
+         |cursor| {
+-            while !cursor.goto_previous_sibling() {
+-                if !cursor.goto_parent() {
+-                    break;
+-                }
+-            }
++            cursor.goto_previous_sibling();
+         },
+         Some(Direction::Backward),
+     )
+@@ -126,9 +118,12 @@ fn select_node_impl<F>(
+         motion(cursor);
+ 
+         let node = cursor.node();
+-        let from = text.byte_to_char(node.start_byte() as usize);
+-        let to = text.byte_to_char(node.end_byte() as usize);
++        let new_from = text.byte_to_char(node.start_byte() as usize);
++        let new_to = text.byte_to_char(node.end_byte() as usize);
+ 
+-        Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()))
++        // TODO: take min of from and max of to if in extend mode
++        // Range::new(min(from, new_from), max(to, new_to))
++        //     .with_direction(direction.unwrap_or_else(|| range.direction()))
++        Range::new(new_from, new_to).with_direction(direction.unwrap_or_else(|| range.direction()))
+     })
+ }
+diff --git a/helix-term/src/commands.rs b/helix-term/src/commands.rs
+index eaf5d33f..2dfc8de6 100644
+--- a/helix-term/src/commands.rs
++++ b/helix-term/src/commands.rs
+@@ -1940,6 +1940,7 @@ pub fn scroll(cx: &mut Context, offset: usize, direction: Direction, sync_cursor
+     let cursor = range.cursor(text);
+     let height = view.inner_height();
+ 
++    // TODO: allow cursor off screen if sync_cursor is false
+     let scrolloff = config.scrolloff.min(height.saturating_sub(1) / 2);
+     let offset = match direction {
+         Forward => offset as isize,
+-- 
+2.43.0
+

@@ -1,0 +1,34 @@
+From 86d71d13c6a0d22d616cfc622969463b2a946418 Mon Sep 17 00:00:00 2001
+From: Connor Keane <connor.keane@kxnr.me>
+Date: Mon, 23 Sep 2024 23:59:29 -0600
+Subject: [PATCH 2/5] add selected lines register
+
+---
+ helix-view/src/register.rs | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/helix-view/src/register.rs b/helix-view/src/register.rs
+index b2bb53ac..9ca34964 100644
+--- a/helix-view/src/register.rs
++++ b/helix-view/src/register.rs
+@@ -43,6 +43,17 @@ pub fn new(clipboard_provider: Box<dyn DynAccess<ClipboardProvider>>) -> Self {
+     pub fn read<'a>(&'a self, name: char, editor: &'a Editor) -> Option<RegisterValues<'a>> {
+         match name {
+             '_' => Some(RegisterValues::new(iter::empty())),
++            '=' => {
++                let (view, doc) = current_ref!(editor);
++                let selections = doc.selection(view.id).line_ranges(doc.text().slice(..));
++                Some(RegisterValues::new(
++                    selections
++                        .map(|(start, end)| Cow::from(format!("{}, {}", start, end)))
++                        // need to collect to make an exact size iterator
++                        .collect::<Vec<_>>()
++                        .into_iter(),
++                ))
++            }
+             '#' => {
+                 let (view, doc) = current_ref!(editor);
+                 let selections = doc.selection(view.id).len();
+-- 
+2.43.0
+

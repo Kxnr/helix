@@ -1,0 +1,121 @@
+From 45e430208046963b15470c330005d8f181cd963e Mon Sep 17 00:00:00 2001
+From: Connor Keane <connor.keane@kxnr.me>
+Date: Thu, 30 Apr 2026 16:56:50 -0700
+Subject: [PATCH 5/5] add extend_next_sibling and extend_prev_sibling commands
+
+In select mode, A-l/A-h now extend the selection to include the next/prev
+sibling rather than jumping to it, keeping the anchor fixed.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+---
+ helix-core/src/object.rs   | 58 ++++++++++++++++++++++++++++++++++++--
+ helix-term/src/commands.rs | 10 +++++++
+ 2 files changed, 65 insertions(+), 3 deletions(-)
+
+diff --git a/helix-core/src/object.rs b/helix-core/src/object.rs
+index 02362803..d1f057d3 100644
+--- a/helix-core/src/object.rs
++++ b/helix-core/src/object.rs
+@@ -97,6 +97,61 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
+     )
+ }
+ 
++pub fn extend_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
++    extend_node_impl(
++        syntax,
++        text,
++        selection,
++        |cursor| {
++            cursor.goto_next_sibling();
++        },
++        Direction::Forward,
++    )
++}
++
++pub fn extend_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
++    extend_node_impl(
++        syntax,
++        text,
++        selection,
++        |cursor| {
++            cursor.goto_previous_sibling();
++        },
++        Direction::Backward,
++    )
++}
++
++fn extend_node_impl<F>(
++    syntax: &Syntax,
++    text: RopeSlice,
++    selection: Selection,
++    motion: F,
++    direction: Direction,
++) -> Selection
++where
++    F: Fn(&mut TreeCursor),
++{
++    let cursor = &mut syntax.walk();
++
++    selection.transform(|range| {
++        let from = text.char_to_byte(range.from()) as u32;
++        let to = text.char_to_byte(range.to()) as u32;
++
++        cursor.reset_to_byte_range(from, to);
++        motion(cursor);
++
++        let node = cursor.node();
++        let new_from = text.byte_to_char(node.start_byte() as usize);
++        let new_to = text.byte_to_char(node.end_byte() as usize);
++
++        // Anchor stays fixed; head moves to the boundary of the target sibling.
++        match direction {
++            Direction::Forward => Range::new(range.anchor, new_to),
++            Direction::Backward => Range::new(range.anchor, new_from),
++        }
++    })
++}
++
+ fn select_node_impl<F>(
+     syntax: &Syntax,
+     text: RopeSlice,
+@@ -121,9 +176,6 @@ fn select_node_impl<F>(
+         let new_from = text.byte_to_char(node.start_byte() as usize);
+         let new_to = text.byte_to_char(node.end_byte() as usize);
+ 
+-        // TODO: take min of from and max of to if in extend mode
+-        // Range::new(min(from, new_from), max(to, new_to))
+-        //     .with_direction(direction.unwrap_or_else(|| range.direction()))
+         Range::new(new_from, new_to).with_direction(direction.unwrap_or_else(|| range.direction()))
+     })
+ }
+diff --git a/helix-term/src/commands.rs b/helix-term/src/commands.rs
+index 2dfc8de6..62c1dfdb 100644
+--- a/helix-term/src/commands.rs
++++ b/helix-term/src/commands.rs
+@@ -529,6 +529,8 @@ pub fn doc(&self) -> &str {
+         shrink_selection, "Shrink selection to previously expanded syntax node",
+         select_next_sibling, "Select next sibling in the syntax tree",
+         select_prev_sibling, "Select previous sibling the in syntax tree",
++        extend_next_sibling, "Extend selection to next sibling in the syntax tree",
++        extend_prev_sibling, "Extend selection to previous sibling in the syntax tree",
+         select_all_siblings, "Select all siblings of the current node",
+         select_all_children, "Select all children of the current node",
+         jump_forward, "Jump forward on jumplist",
+@@ -5732,6 +5734,14 @@ fn select_prev_sibling(cx: &mut Context) {
+     select_sibling_impl(cx, object::select_prev_sibling)
+ }
+ 
++fn extend_next_sibling(cx: &mut Context) {
++    select_sibling_impl(cx, object::extend_next_sibling)
++}
++
++fn extend_prev_sibling(cx: &mut Context) {
++    select_sibling_impl(cx, object::extend_prev_sibling)
++}
++
+ fn move_node_bound_impl(cx: &mut Context, dir: Direction, movement: Movement) {
+     let motion = move |editor: &mut Editor| {
+         let (view, doc) = current!(editor);
+-- 
+2.43.0
+
