@@ -2546,6 +2546,72 @@ fn pipe_impl(
     Ok(())
 }
 
+fn blame_selection(
+    cx: &mut compositor::Context,
+    _args: Args,
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    let (view, doc) = current!(cx.editor);
+    let path = doc
+        .path()
+        .context("blame requires a file on disk")?
+        .to_path_buf();
+    let text = doc.text().slice(..);
+    let selection = doc.selection(view.id).primary();
+    let (start_line, end_line) = selection.line_range(text);
+    // helix uses 0-indexed lines; get_blame expects 1-indexed inclusive
+    let (start_1, end_1) = (start_line as u32 + 1, end_line as u32 + 1);
+
+    let callback = async move {
+        let lines = tokio::task::spawn_blocking(move || {
+            helix_vcs::get_blame(&path, start_1, end_1)
+        })
+        .await??;
+
+        let text = if lines.is_empty() {
+            String::from("(no blame output)")
+        } else {
+            let max_author = lines.iter().map(|l| l.author.len()).max().unwrap_or(0);
+            lines
+                .iter()
+                .map(|l| {
+                    format!(
+                        "{} ({:<width$} {}) {:>5} {}",
+                        l.commit,
+                        l.author,
+                        l.date,
+                        l.line_no,
+                        l.content,
+                        width = max_author,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        let call: job::Callback = Callback::EditorCompositor(Box::new(
+            move |editor: &mut Editor, compositor: &mut Compositor| {
+                let contents = ui::Markdown::new(
+                    format!("```\n{}\n```", text),
+                    editor.syn_loader.clone(),
+                );
+                let popup = Popup::new("blame", contents).position(Some(
+                    helix_core::Position::new(editor.cursor().0.unwrap_or_default().row, 2),
+                ));
+                compositor.replace_or_push("blame", popup);
+            },
+        ));
+        Ok(call)
+    };
+    cx.jobs.callback(callback);
+
+    Ok(())
+}
+
 fn run_shell_command(
     cx: &mut compositor::Context,
     args: Args,
@@ -3991,7 +4057,15 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         fun: untrust_workspace,
         completer: CommandCompleter::none(),
         signature: Signature { positionals: (0, None), ..Signature::DEFAULT },
-    }
+    },
+    TypableCommand {
+        name: "blame",
+        aliases: &["gb"],
+        doc: "Show git blame for the current selection's line range in a popup.",
+        fun: blame_selection,
+        completer: CommandCompleter::none(),
+        signature: Signature { positionals: (0, Some(0)), ..Signature::DEFAULT },
+    },
 ];
 
 pub static TYPABLE_COMMAND_MAP: Lazy<HashMap<&'static str, &'static TypableCommand>> =

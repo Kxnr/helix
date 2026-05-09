@@ -20,6 +20,27 @@ mod status;
 
 pub use status::FileChange;
 
+/// One blamed line: the commit that last touched it plus authorship metadata.
+pub struct BlamedLine {
+    pub commit: String,
+    pub author: String,
+    pub date: String,
+    pub line_no: u32,
+    pub content: String,
+}
+
+/// Run `git blame` on `file` for lines `start_line..=end_line` (1-indexed, inclusive).
+/// Returns an error when the `git` feature is not compiled in or the file is not tracked.
+pub fn get_blame(file: &Path, start_line: u32, end_line: u32) -> Result<Vec<BlamedLine>> {
+    #[cfg(feature = "git")]
+    return git::get_blame(file, start_line, end_line);
+    #[cfg(not(feature = "git"))]
+    {
+        let _ = (file, start_line, end_line);
+        bail!("git support not compiled in");
+    }
+}
+
 /// Contains all active diff providers. Diff providers are compiled in via features. Currently
 /// only `git` is supported.
 #[derive(Clone)]

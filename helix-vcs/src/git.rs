@@ -5,6 +5,8 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::BlamedLine;
+
 use gix::bstr::ByteSlice;
 use gix::diff::Rewrites;
 use gix::dir::entry::Status;
@@ -216,4 +218,58 @@ fn find_file_in_commit(repo: &Repository, commit: &Commit, file: &Path) -> Resul
         // found a file
         EntryKind::Blob | EntryKind::BlobExecutable => Ok(tree_entry.object_id()),
     }
+}
+
+/// Returns blame information for each line in `start_line..=end_line` (1-indexed, inclusive).
+pub fn get_blame(file: &Path, start_line: u32, end_line: u32) -> Result<Vec<BlamedLine>> {
+    debug_assert!(!file.exists() || file.is_file());
+    debug_assert!(file.is_absolute());
+    let file = gix::path::realpath(file).context("resolve symlinks")?;
+
+    let repo_dir = get_repo_dir(&file)?;
+    let repo = open_repo(repo_dir)?.to_thread_local();
+    let work_dir = repo.workdir().context("repo has no worktree")?;
+    let rela_path = file.strip_prefix(work_dir)?;
+    let rela_path = gix::path::try_into_bstr(rela_path.to_path_buf())?;
+
+    let head_id = repo.head_commit()?.id;
+
+    let ranges = gix::blame::BlameRanges::from_one_based_inclusive_range(start_line..=end_line)?;
+    let outcome = repo.blame_file(
+        rela_path.as_ref(),
+        head_id,
+        gix::repository::blame_file::Options {
+            ranges,
+            ..Default::default()
+        },
+    )?;
+
+    let content = String::from_utf8_lossy(&outcome.blob);
+    let file_lines: Vec<&str> = content.split('\n').collect();
+
+    let mut result = Vec::new();
+    for entry in &outcome.entries {
+        let commit = repo.find_object(entry.commit_id)?.into_commit();
+        let author = commit.author()?;
+        let commit_hash = entry.commit_id.to_hex_with_len(8).to_string();
+        let author_name = author.name.to_string();
+        let date = author
+            .time()
+            .map(|t| t.format_or_unix(gix::date::time::format::SHORT))
+            .unwrap_or_else(|_| "unknown".into());
+
+        for i in 0..entry.len.get() {
+            let line_idx = (entry.start_in_blamed_file + i) as usize;
+            let line_content = file_lines.get(line_idx).copied().unwrap_or("").to_string();
+            result.push(BlamedLine {
+                commit: commit_hash.clone(),
+                author: author_name.clone(),
+                date: date.clone(),
+                line_no: entry.start_in_blamed_file + i + 1,
+                content: line_content,
+            });
+        }
+    }
+
+    Ok(result)
 }
