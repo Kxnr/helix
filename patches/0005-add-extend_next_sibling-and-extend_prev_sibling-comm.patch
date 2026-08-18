@@ -1,7 +1,8 @@
 From 45e430208046963b15470c330005d8f181cd963e Mon Sep 17 00:00:00 2001
 From: Connor Keane <connor.keane@kxnr.me>
 Date: Thu, 30 Apr 2026 16:56:50 -0700
-Subject: [PATCH 5/5] add extend_next_sibling and extend_prev_sibling commands
+Subject: [PATCH 05/10] add extend_next_sibling and extend_prev_sibling
+ commands
 
 In select mode, A-l/A-h now extend the selection to include the next/prev
 sibling rather than jumping to it, keeping the anchor fixed.

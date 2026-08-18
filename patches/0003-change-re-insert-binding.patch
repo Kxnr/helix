@@ -1,7 +1,7 @@
 From 53544dd111a80de771c5063812f6215726b1b160 Mon Sep 17 00:00:00 2001
 From: Connor Keane <ckeane@ascendanalytics.com>
 Date: Mon, 7 Oct 2024 14:17:52 -0600
-Subject: [PATCH 3/5] change re-insert binding
+Subject: [PATCH 03/10] change re-insert binding
 
 ---
  helix-term/src/ui/editor.rs | 4 ++--

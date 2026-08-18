@@ -1,7 +1,7 @@
 From 86d71d13c6a0d22d616cfc622969463b2a946418 Mon Sep 17 00:00:00 2001
 From: Connor Keane <connor.keane@kxnr.me>
 Date: Mon, 23 Sep 2024 23:59:29 -0600
-Subject: [PATCH 2/5] add selected lines register
+Subject: [PATCH 02/10] add selected lines register
 
 ---
  helix-view/src/register.rs | 11 +++++++++++

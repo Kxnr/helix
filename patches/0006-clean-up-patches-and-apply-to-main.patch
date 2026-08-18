@@ -1,0 +1,24 @@
+From b72067d498fdb2bfe8002a9ac14a32d79ad1e7b8 Mon Sep 17 00:00:00 2001
+From: Connor Keane <connor.keane@kxnr.me>
+Date: Fri, 1 May 2026 14:54:13 -0700
+Subject: [PATCH 06/10] clean up patches and apply to main
+
+---
+ helix-lsp-types/src/trace.rs | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/helix-lsp-types/src/trace.rs b/helix-lsp-types/src/trace.rs
+index 7abcc567..3605423a 100644
+--- a/helix-lsp-types/src/trace.rs
++++ b/helix-lsp-types/src/trace.rs
+@@ -6,6 +6,7 @@ pub struct SetTraceParams {
+     pub value: TraceValue,
+ }
+ 
++
+ /// A TraceValue represents the level of verbosity with which the server systematically
+ /// reports its execution trace using `LogTrace` notifications.
+ ///
+-- 
+2.43.0
+

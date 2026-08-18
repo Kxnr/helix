@@ -1,7 +1,7 @@
 From bc5b10511ca8ac8b53c667205684ac11b8fe125f Mon Sep 17 00:00:00 2001
 From: Connor Keane <ckeane@ascendanalytics.com>
 Date: Sun, 27 Apr 2025 23:46:04 -0600
-Subject: [PATCH 1/5] iterate only over siblings
+Subject: [PATCH 01/10] iterate only over siblings
 
 ---
  helix-core/src/object.rs   | 21 ++++++++-------------

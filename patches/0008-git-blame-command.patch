@@ -1,0 +1,421 @@
+From ff8ea0ec1adb66ce488bdb135f37bdc624c05e8e Mon Sep 17 00:00:00 2001
+From: Connor Keane <connor.keane@kxnr.me>
+Date: Fri, 8 May 2026 21:44:47 -0700
+Subject: [PATCH 08/10] git blame command
+
+---
+ Cargo.lock                       | 76 ++++++++++++++++++++------------
+ helix-term/src/commands/typed.rs | 76 +++++++++++++++++++++++++++++++-
+ helix-vcs/Cargo.toml             |  2 +-
+ helix-vcs/src/git.rs             | 56 +++++++++++++++++++++++
+ helix-vcs/src/lib.rs             | 21 +++++++++
+ 5 files changed, 202 insertions(+), 29 deletions(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 3ff60102..aeeccb58 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -529,6 +529,7 @@ checksum = "5aa56fdbfe98258af2759818ddc3175cc581112660e74c3fd55669836d29a994"
+ dependencies = [
+  "gix-actor",
+  "gix-attributes",
++ "gix-blame",
+  "gix-command",
+  "gix-commitgraph",
+  "gix-config",
+@@ -603,18 +604,38 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-bitmap"
+-version = "0.3.0"
++version = "0.3.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "e7add20f40d060db8c9b1314d499bac6ed7480f33eb113ce3e1cf5d6ff85d989"
++checksum = "1ecbfc77ec6852294e341ecc305a490b59f2813e6ca42d79efda5099dcab1894"
+ dependencies = [
+  "gix-error",
+ ]
+ 
+ [[package]]
+-name = "gix-chunk"
+-version = "0.7.0"
++name = "gix-blame"
++version = "0.10.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1096b6608fbe5d27fb4984e20f992b4e76fb8c613f6acb87d07c5831b53a6959"
++checksum = "2093922a26722186a2ea36615d581639299ca7d68241d8116d8c441da6f96b1a"
++dependencies = [
++ "gix-commitgraph",
++ "gix-date",
++ "gix-diff",
++ "gix-error",
++ "gix-hash",
++ "gix-object",
++ "gix-revwalk",
++ "gix-trace",
++ "gix-traverse",
++ "gix-worktree",
++ "smallvec",
++ "thiserror",
++]
++
++[[package]]
++name = "gix-chunk"
++version = "0.7.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "edf288be9b60fe7231de03771faa292be1493d84786f68727e33ad1f91764320"
+ dependencies = [
+  "gix-error",
+ ]
+@@ -681,9 +702,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-date"
+-version = "0.15.0"
++version = "0.15.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "6c2f2155782090fd947c2f7904166b9f3c3da0d91358adb011f753ea3a55c0ff"
++checksum = "b94cdae4eb4b0f4136e3d9b3aa2d2cd03cfb5bb9b636b31263aea2df86d41543"
+ dependencies = [
+  "bstr",
+  "gix-error",
+@@ -713,6 +734,7 @@ dependencies = [
+  "gix-traverse",
+  "gix-worktree",
+  "imara-diff 0.1.8",
++ "imara-diff 0.2.0",
+  "thiserror",
+ ]
+ 
+@@ -753,9 +775,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-error"
+-version = "0.2.0"
++version = "0.2.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "f2dfe8025209bf2a72d97a6f2dff105b93e5ebcf131ffa3d3f1728ce4ac3767b"
++checksum = "e207b971746ab724fccdfced2e4e19e854744611904a0195d3aa8fda8a110613"
+ dependencies = [
+  "bstr",
+ ]
+@@ -965,9 +987,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-packetline"
+-version = "0.21.1"
++version = "0.21.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "25429ee1ef792d9b653ee5de09bb525489fc8e6908334cfd5d5824269f0b7073"
++checksum = "362246df440ee691699f0664cbf7006a6ece477db6734222be95e4198e5656e6"
+ dependencies = [
+  "bstr",
+  "faster-hex",
+@@ -1024,9 +1046,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-quote"
+-version = "0.7.0"
++version = "0.7.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "68533db71259c8776dd4e770d2b7b98696213ecdc1f5c9e3507119e274e0c578"
++checksum = "6e97b73791a64bc0fa7dd2c5b3e551136115f97750b876ed1c952c7a7dbaf8be"
+ dependencies = [
+  "bstr",
+  "gix-error",
+@@ -1180,9 +1202,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-trace"
+-version = "0.1.18"
++version = "0.1.19"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "f69a13643b8437d4ca6845e08143e847a36ca82903eed13303475d0ae8b162e0"
++checksum = "6f23569e55f2ffaf958617353b9734a7d52a7c19c439eeaa5e3efc217fd2270e"
+ 
+ [[package]]
+ name = "gix-transport"
+@@ -1231,9 +1253,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-utils"
+-version = "0.3.1"
++version = "0.3.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "befcdbdfb1238d2854591f760a48711bed85e72d80a10e8f2f93f656746ef7c5"
++checksum = "4e477b4f07a6e8da4ba791c53c858102959703c60d70f199932010d5b94adb2c"
+ dependencies = [
+  "bstr",
+  "fastrand",
+@@ -1242,9 +1264,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "gix-validate"
+-version = "0.11.0"
++version = "0.11.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "0ec1eff98d91941f47766367cba1be746bab662bad761d9891ae6f7882f7840b"
++checksum = "e26ac2602b43eadfdca0560b81d3341944162a3c9f64ccdeef8fc501ad80dad5"
+ dependencies = [
+  "bstr",
+ ]
+@@ -1921,9 +1943,9 @@ checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+ 
+ [[package]]
+ name = "jiff"
+-version = "0.2.18"
++version = "0.2.24"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "e67e8da4c49d6d9909fe03361f9b620f58898859f5c7aded68351e85e71ecf50"
++checksum = "f00b5dbd620d61dfdcb6007c9c1f6054ebd75319f163d886a9055cec1155073d"
+ dependencies = [
+  "jiff-static",
+  "jiff-tzdb-platform",
+@@ -1936,9 +1958,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "jiff-static"
+-version = "0.2.18"
++version = "0.2.24"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "e0c84ee7f197eca9a86c6fd6cb771e55eb991632f15f2bc3ca6ec838929e6e78"
++checksum = "e000de030ff8022ea1da3f466fbb0f3a809f5e51ed31f6dd931c35181ad8e6d7"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -2064,9 +2086,9 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+ 
+ [[package]]
+ name = "memmap2"
+-version = "0.9.9"
++version = "0.9.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
++checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
+ dependencies = [
+  "libc",
+ ]
+@@ -2758,8 +2780,8 @@ name = "spellbook"
+ version = "0.3.5"
+ source = "git+https://github.com/helix-editor/spellbook.git#c946f1a950d6f3cee67ad88201ab840be3e4e57d"
+ dependencies = [
+- "foldhash 0.1.5",
+- "hashbrown 0.15.5",
++ "foldhash 0.2.0",
++ "hashbrown 0.17.0",
+ ]
+ 
+ [[package]]
+diff --git a/helix-term/src/commands/typed.rs b/helix-term/src/commands/typed.rs
+index 85cf6b1d..f766f13f 100644
+--- a/helix-term/src/commands/typed.rs
++++ b/helix-term/src/commands/typed.rs
+@@ -2546,6 +2546,72 @@ fn pipe_impl(
+     Ok(())
+ }
+ 
++fn blame_selection(
++    cx: &mut compositor::Context,
++    _args: Args,
++    event: PromptEvent,
++) -> anyhow::Result<()> {
++    if event != PromptEvent::Validate {
++        return Ok(());
++    }
++
++    let (view, doc) = current!(cx.editor);
++    let path = doc
++        .path()
++        .context("blame requires a file on disk")?
++        .to_path_buf();
++    let text = doc.text().slice(..);
++    let selection = doc.selection(view.id).primary();
++    let (start_line, end_line) = selection.line_range(text);
++    // helix uses 0-indexed lines; get_blame expects 1-indexed inclusive
++    let (start_1, end_1) = (start_line as u32 + 1, end_line as u32 + 1);
++
++    let callback = async move {
++        let lines = tokio::task::spawn_blocking(move || {
++            helix_vcs::get_blame(&path, start_1, end_1)
++        })
++        .await??;
++
++        let text = if lines.is_empty() {
++            String::from("(no blame output)")
++        } else {
++            let max_author = lines.iter().map(|l| l.author.len()).max().unwrap_or(0);
++            lines
++                .iter()
++                .map(|l| {
++                    format!(
++                        "{} ({:<width$} {}) {:>5} {}",
++                        l.commit,
++                        l.author,
++                        l.date,
++                        l.line_no,
++                        l.content,
++                        width = max_author,
++                    )
++                })
++                .collect::<Vec<_>>()
++                .join("\n")
++        };
++
++        let call: job::Callback = Callback::EditorCompositor(Box::new(
++            move |editor: &mut Editor, compositor: &mut Compositor| {
++                let contents = ui::Markdown::new(
++                    format!("```\n{}\n```", text),
++                    editor.syn_loader.clone(),
++                );
++                let popup = Popup::new("blame", contents).position(Some(
++                    helix_core::Position::new(editor.cursor().0.unwrap_or_default().row, 2),
++                ));
++                compositor.replace_or_push("blame", popup);
++            },
++        ));
++        Ok(call)
++    };
++    cx.jobs.callback(callback);
++
++    Ok(())
++}
++
+ fn run_shell_command(
+     cx: &mut compositor::Context,
+     args: Args,
+@@ -3991,7 +4057,15 @@ fn noop(_cx: &mut compositor::Context, _args: Args, _event: PromptEvent) -> anyh
+         fun: untrust_workspace,
+         completer: CommandCompleter::none(),
+         signature: Signature { positionals: (0, None), ..Signature::DEFAULT },
+-    }
++    },
++    TypableCommand {
++        name: "blame",
++        aliases: &["gb"],
++        doc: "Show git blame for the current selection's line range in a popup.",
++        fun: blame_selection,
++        completer: CommandCompleter::none(),
++        signature: Signature { positionals: (0, Some(0)), ..Signature::DEFAULT },
++    },
+ ];
+ 
+ pub static TYPABLE_COMMAND_MAP: Lazy<HashMap<&'static str, &'static TypableCommand>> =
+diff --git a/helix-vcs/Cargo.toml b/helix-vcs/Cargo.toml
+index 46c22ac3..4161278b 100644
+--- a/helix-vcs/Cargo.toml
++++ b/helix-vcs/Cargo.toml
+@@ -17,7 +17,7 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "p
+ parking_lot.workspace = true
+ arc-swap.workspace = true
+ 
+-gix = { version = "0.80.0", features = ["attributes", "status", "max-performance"], default-features = false, optional = true }
++gix = { version = "0.80.0", features = ["attributes", "status", "max-performance", "blame"], default-features = false, optional = true }
+ imara-diff =  "0.2.0"
+ anyhow = "1"
+ 
+diff --git a/helix-vcs/src/git.rs b/helix-vcs/src/git.rs
+index 9cb010e6..777a9445 100644
+--- a/helix-vcs/src/git.rs
++++ b/helix-vcs/src/git.rs
+@@ -5,6 +5,8 @@
+ use std::path::Path;
+ use std::sync::Arc;
+ 
++use crate::BlamedLine;
++
+ use gix::bstr::ByteSlice;
+ use gix::diff::Rewrites;
+ use gix::dir::entry::Status;
+@@ -217,3 +219,57 @@ fn find_file_in_commit(repo: &Repository, commit: &Commit, file: &Path) -> Resul
+         EntryKind::Blob | EntryKind::BlobExecutable => Ok(tree_entry.object_id()),
+     }
+ }
++
++/// Returns blame information for each line in `start_line..=end_line` (1-indexed, inclusive).
++pub fn get_blame(file: &Path, start_line: u32, end_line: u32) -> Result<Vec<BlamedLine>> {
++    debug_assert!(!file.exists() || file.is_file());
++    debug_assert!(file.is_absolute());
++    let file = gix::path::realpath(file).context("resolve symlinks")?;
++
++    let repo_dir = get_repo_dir(&file)?;
++    let repo = open_repo(repo_dir)?.to_thread_local();
++    let work_dir = repo.workdir().context("repo has no worktree")?;
++    let rela_path = file.strip_prefix(work_dir)?;
++    let rela_path = gix::path::try_into_bstr(rela_path.to_path_buf())?;
++
++    let head_id = repo.head_commit()?.id;
++
++    let ranges = gix::blame::BlameRanges::from_one_based_inclusive_range(start_line..=end_line)?;
++    let outcome = repo.blame_file(
++        rela_path.as_ref(),
++        head_id,
++        gix::repository::blame_file::Options {
++            ranges,
++            ..Default::default()
++        },
++    )?;
++
++    let content = String::from_utf8_lossy(&outcome.blob);
++    let file_lines: Vec<&str> = content.split('\n').collect();
++
++    let mut result = Vec::new();
++    for entry in &outcome.entries {
++        let commit = repo.find_object(entry.commit_id)?.into_commit();
++        let author = commit.author()?;
++        let commit_hash = entry.commit_id.to_hex_with_len(8).to_string();
++        let author_name = author.name.to_string();
++        let date = author
++            .time()
++            .map(|t| t.format_or_unix(gix::date::time::format::SHORT))
++            .unwrap_or_else(|_| "unknown".into());
++
++        for i in 0..entry.len.get() {
++            let line_idx = (entry.start_in_blamed_file + i) as usize;
++            let line_content = file_lines.get(line_idx).copied().unwrap_or("").to_string();
++            result.push(BlamedLine {
++                commit: commit_hash.clone(),
++                author: author_name.clone(),
++                date: date.clone(),
++                line_no: entry.start_in_blamed_file + i + 1,
++                content: line_content,
++            });
++        }
++    }
++
++    Ok(result)
++}
+diff --git a/helix-vcs/src/lib.rs b/helix-vcs/src/lib.rs
+index 4c5f2036..9b2f8aff 100644
+--- a/helix-vcs/src/lib.rs
++++ b/helix-vcs/src/lib.rs
+@@ -20,6 +20,27 @@
+ 
+ pub use status::FileChange;
+ 
++/// One blamed line: the commit that last touched it plus authorship metadata.
++pub struct BlamedLine {
++    pub commit: String,
++    pub author: String,
++    pub date: String,
++    pub line_no: u32,
++    pub content: String,
++}
++
++/// Run `git blame` on `file` for lines `start_line..=end_line` (1-indexed, inclusive).
++/// Returns an error when the `git` feature is not compiled in or the file is not tracked.
++pub fn get_blame(file: &Path, start_line: u32, end_line: u32) -> Result<Vec<BlamedLine>> {
++    #[cfg(feature = "git")]
++    return git::get_blame(file, start_line, end_line);
++    #[cfg(not(feature = "git"))]
++    {
++        let _ = (file, start_line, end_line);
++        bail!("git support not compiled in");
++    }
++}
++
+ /// Contains all active diff providers. Diff providers are compiled in via features. Currently
+ /// only `git` is supported.
+ #[derive(Clone)]
+-- 
+2.43.0
+
